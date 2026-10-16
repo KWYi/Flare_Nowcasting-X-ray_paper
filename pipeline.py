@@ -52,12 +52,31 @@ class XRS_Dataset_Sliding_Window_Timeseries(Dataset):
 
                 input_parts = np.stack(input_datatype_cache, axis=-1)
                 target_parts = _data["target_real_peak_flux"].to_numpy(dtype=np.float32)[:, None]
-
+                label_parts = np.full(
+                    (len(target_parts),),
+                    class_label_map[fc],
+                    dtype=np.int64
+                )
+                
                 input_all_cache.append(input_parts)
                 target_all_cache.append(target_parts)
+                label_all_cache.append(label_parts)
+
+                event_idx_all_cache.append(_data["event_row_index"].to_numpy())
+                after_onset_all_cache.append(_data["after_onset"].to_numpy())
+                before_peak_all_cache.append(_data["before_peak"].to_numpy())
+
+                event_start_cache.append(_data["start"].to_numpy())
 
         self.input_data = np.concatenate(input_all_cache, axis=0)
         self.target_data = np.concatenate(target_all_cache, axis=0)
+        self.labels = np.concatenate(label_all_cache, axis=0)
+
+        self.event_row_index = np.concatenate(event_idx_all_cache, axis=0)
+        self.after_onset = np.concatenate(after_onset_all_cache, axis=0)
+        self.before_peak = np.concatenate(before_peak_all_cache, axis=0)
+
+        self.start_time = np.concatenate(event_start_cache, axis=0)
 
         if self.logarithm is True:
             self.input_data = np.log10(self.input_data + 1e-9)
@@ -68,8 +87,16 @@ class XRS_Dataset_Sliding_Window_Timeseries(Dataset):
     def __getitem__(self, idx):
         _input = self.input_data[idx]
         _target = self.target_data[idx]
+        _label = self.labels[idx]
 
-        return _input, _target
+        _event_idx = self.event_row_index[idx]
+        _after_onset = self.after_onset[idx]
+        _before_peak = self.before_peak[idx]
+
+        _start_time = self.start_time[idx]
+        _start_time = str(_start_time)
+
+        return _input, _target, _label, _event_idx, _after_onset, _before_peak, _start_time
 
     def __len__(self):
         return self.len
