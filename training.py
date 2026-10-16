@@ -101,7 +101,7 @@ for i in range(4):
         E.train()
         D.train()
 
-        for Train_input, Train_target in Train_data_loader:
+        for Train_input, Train_target, _, __, ___, ____, _____ in Train_data_loader:
             Train_input = Train_input.to(device=DEVICE, dtype=torch.float32)
             Train_target = Train_target.to(device=DEVICE, dtype=torch.float32)
 
@@ -120,7 +120,7 @@ for i in range(4):
             E.eval()
             D.eval()
 
-            for Test_input, Test_target in Test_data_loader:
+            for Test_input, Test_target, _, __, ___, ____, _____ in Test_data_loader:
                 Test_input = Test_input.to(device=DEVICE, dtype=torch.float32)
                 Test_target = Test_target.to(device=DEVICE, dtype=torch.float32)
 
