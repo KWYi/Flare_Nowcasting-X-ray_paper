@@ -6,6 +6,7 @@ import numpy as np
 
 DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu:0')
 
+
 class Encoder4Attn(nn.Module):
     def __init__(self, input_size, hidden_size, layer_num, encoded_size=False, drop_frac=0.0,
                  initiallize=False, bidirection=False):
@@ -123,3 +124,39 @@ class AttnDecoder_ver3(nn.Module):
                     nn.init.orthogonal_(param, gain=1)
                 elif 'bias' in name:
                     nn.init.constant_(param, 0)
+
+
+class AttnDecoder_ver3_uncertainty(nn.Module):
+    def __init__(self, encoded_size, hidden_size, layer_num, input_len, output_size=1, drop_frac=0., mc_dropout=0.1,
+                 extracted_size=False, initiallize=False):
+        super(AttnDecoder_ver3_uncertainty, self).__init__()
+        self.encoded_size = encoded_size
+        self.hidden_size = hidden_size
+        self.layer_num = layer_num
+        self.input_len = input_len
+        self.extracted_size = extracted_size
+        self.output_size = output_size
+        self.mc_dropout = mc_dropout
+
+        self.fc_hidden = nn.Linear(self.hidden_size, self.encoded_size, bias=False)
+        self.fc_encoder = nn.Linear(self.encoded_size, self.encoded_size, bias=False)
+        self.attention_weights = nn.Linear(self.encoded_size, 1)
+        self.lstm = nn.LSTM(input_size=self.encoded_size+1, hidden_size=self.hidden_size, num_layers=self.layer_num,
+                            batch_first=True, dropout=drop_frac)
+        self.linear = nn.Linear(in_features=self.hidden_size, out_features=self.output_size, bias=False)
+
+
+    def forward(self, input, hidden, encoder_outputs):
+        temp_hidden = hidden[0][-1:]
+        temp_hidden = torch.transpose(temp_hidden, 0, 1)
+        alignment_score = torch.tanh(
+                            self.fc_hidden(temp_hidden) + self.fc_encoder(encoder_outputs))
+        alignment_score = self.attention_weights(alignment_score)
+        alignment_score = torch.transpose(alignment_score, 1, 2)
+        applied_weights = F.softmax(alignment_score, dim=2)
+        context_vector = torch.bmm(applied_weights, encoder_outputs)
+        output = torch.cat((input, context_vector), dim=2)
+        output, hidden = self.lstm(output, hidden)
+        output = F.dropout(output, p=self.mc_dropout, training=True)
+        output = self.linear(output)
+        return output, hidden, applied_weights.detach()
